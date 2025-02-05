@@ -6,10 +6,15 @@ A modern React application built with Vite and Material UI for managing technici
 
 ### Core Components
 
-- **App Component** (`App.jsx`): Main application container
-  - Chat interface
-  - Booking management
-  - Natural language interaction
+The application is split into several modular components for better maintainability:
+
+- **App Component** (`App.jsx`): Main application container and state management
+- **ChatWindow** (`components/ChatWindow.jsx`): Handles the chat display and message rendering
+- **ChatMessage** (`components/ChatMessage.jsx`): Individual message component
+- **ChatInput** (`components/ChatInput.jsx`): Message input form with send button
+- **BookingList** (`components/BookingList.jsx`): Displays the list of bookings
+- **BookingDialog** (`components/BookingDialog.jsx`): Modal for viewing and managing bookings
+- **Theme** (`theme/theme.js`): Custom Material UI theme configuration
 
 ### Key Features
 
@@ -56,12 +61,20 @@ A modern React application built with Vite and Material UI for managing technici
 ```
 frontend/
 ├── src/
-│   ├── App.jsx         # Main application component
-│   ├── main.jsx        # Application entry point
-│   └── assets/         # Static assets
-├── public/             # Public assets
-├── index.html          # HTML template
-└── package.json        # Dependencies and scripts
+│   ├── components/     # React components
+│   │   ├── ChatWindow.jsx
+│   │   ├── ChatMessage.jsx
+│   │   ├── ChatInput.jsx
+│   │   ├── BookingList.jsx
+│   │   └── BookingDialog.jsx
+│   ├── theme/         # Theme configuration
+│   │   └── theme.js
+│   ├── App.jsx        # Main application component
+│   ├── main.jsx       # Application entry point
+│   └── assets/        # Static assets
+├── public/            # Public assets
+├── index.html         # HTML template
+└── package.json       # Dependencies and scripts
 ```
 
 ## Technologies Used
@@ -71,76 +84,37 @@ frontend/
 - **Material UI**: React component library
 - **Axios**: HTTP client for API requests
 
-## Features
+## Component Details
 
-### Chat Interface
-- Real-time message updates
-- Conversation history
-- Loading states
-- Error handling
-- Auto-scrolling to latest messages
+### ChatWindow
+- Displays chat messages
+- Handles message scrolling
+- Shows loading states
+- Fixed height container with overflow
 
-### Booking Management
-- List all bookings
-- Sort bookings by date
-- Delete individual bookings
-- Bulk delete functionality
-- Real-time updates
+### ChatMessage
+- Renders individual messages
+- Different styles for user/system messages
+- Paper component with custom styling
 
-### UI/UX
+### ChatInput
+- Message input form
+- Send button with loading state
+- Form validation
+
+### BookingList
+- Displays bookings in a sorted list
+- Shows booking details
+- Empty state handling
+
+### BookingDialog
+- Modal for viewing bookings
+- Delete functionality
 - Responsive design
-- Material Design components
-- Loading indicators
-- Error messages
-- Confirmation dialogs
 
 ## API Integration
 
 The frontend communicates with the backend through:
 - `http://localhost:8000` API endpoint
 - Axios for HTTP requests
-- Real-time booking updates
-- Error handling and retries
-
-## Docker Support
-
-The application is containerized using Docker:
-
-```dockerfile
-FROM node:18-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-COPY . .
-EXPOSE 5173
-CMD ["npm", "run", "dev"]
-```
-
-## Development Notes
-
-1. **Hot Module Replacement (HMR)**
-   - Automatic page updates
-   - State preservation
-   - Fast refresh
-
-2. **Code Organization**
-   - Component-based architecture
-   - Hooks for state management
-   - Utility functions
-
-3. **Best Practices**
-   - Error boundaries
-   - Loading states
-   - User feedback
-   - Responsive design
-
-## Testing
-
-Run tests with:
-```bash
-npm run test
-```
-
-## Environment Variables
-
-No environment variables required for frontend development. The backend URL is configured in `App.jsx`.
+- Real-time updates on booking changes
