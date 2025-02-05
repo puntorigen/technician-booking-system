@@ -204,6 +204,13 @@ The system uses LangChain with Groq's DeepSeek model to process natural language
 
 The system leverages Groq's high-performance cloud infrastructure for fast and reliable responses.
 
+## Notes and Future Improvements
+
+### Current Limitations
+
+- The system currently operates in the server's local timezone
+- Booking times are stored and displayed without timezone context
+
 ## Docker Development
 
 The project includes Docker support for both development and production environments:
