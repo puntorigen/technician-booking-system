@@ -22,23 +22,7 @@ function App() {
   const [bookings, setBookings] = useState([])
   const [showBookings, setShowBookings] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const messagesEndRef = useRef(null)
-
-  // Scroll to the bottom of the chat whenever new messages arrive
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [])
-
-  // Fetch bookings when the component mounts
-  useEffect(() => {
-    fetchBookings()
-    scrollToBottom()
-  }, [scrollToBottom])
-
-  // Auto-scroll when messages update
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+  const chatContainerRef = useRef(null)
 
   // Helper to add a new message to the chat history
   const addMessage = useCallback((type, text) => {
@@ -55,6 +39,23 @@ function App() {
       addMessage("system", "Failed to fetch bookings")
     }
   }, [addMessage])
+
+  // Scroll to the bottom of the chat when new messages arrive
+  const scrollToBottom = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [])
+
+  // Fetch bookings when component mounts
+  useEffect(() => {
+    fetchBookings()
+  }, [fetchBookings])
+
+  // Auto-scroll when messages update
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
   // Handle the chat form submission
   const handleSubmit = async (e) => {
@@ -164,9 +165,9 @@ function App() {
           </Box>
 
           <ChatWindow 
+            ref={chatContainerRef}
             messages={messages}
             loading={loading}
-            messagesEndRef={messagesEndRef}
           />
 
           <ChatInput

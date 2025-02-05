@@ -1,16 +1,17 @@
 import { Paper, List, ListItem, CircularProgress, Typography } from "@mui/material"
 import { ChatMessage } from "./ChatMessage"
+import { forwardRef } from "react"
 
-export const ChatWindow = ({ messages, loading, messagesEndRef }) => {
+export const ChatWindow = forwardRef(({ messages, loading }, chatContainerRef) => {
   return (
     <Paper
+      ref={chatContainerRef}
       elevation={0}
       sx={{
         flex: 1,
         mb: 2,
         p: 3,
-        minHeight: "40vh",
-        maxHeight: "50vh",
+        height: "40vh", 
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
@@ -42,8 +43,7 @@ export const ChatWindow = ({ messages, loading, messagesEndRef }) => {
             </Paper>
           </ListItem>
         )}
-        <div ref={messagesEndRef} />
       </List>
     </Paper>
   )
-}
+})
