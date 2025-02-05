@@ -390,7 +390,8 @@ async def delete_all_bookings(session: Session = Depends(get_session)):
     """Delete all bookings from the database."""
     try:
         logger.info("Attempting to delete all bookings...")
-        statement = select(Booking).where(Booking.status == "booked")
+        # Remove status filter to delete all bookings
+        statement = select(Booking)
         bookings = session.exec(statement).all()
         
         count = len(bookings)

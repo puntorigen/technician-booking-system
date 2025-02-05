@@ -1,123 +1,236 @@
-import { useState, useEffect, useRef } from 'react'
-import { 
-  Container, 
-  TextField, 
-  Button, 
-  Typography, 
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Container,
+  TextField,
+  Button,
+  Typography,
   Paper,
-  List, 
-  ListItem, 
+  List,
+  ListItem,
   ListItemText,
   CircularProgress,
-  Box,
   IconButton,
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions
-} from '@mui/material'
-import SendIcon from '@mui/icons-material/Send'
-import axios from 'axios'
+  DialogActions,
+  createTheme,
+  ThemeProvider,
+} from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
+import axios from 'axios';
 
-const API_URL = 'http://localhost:8000'  // Always use localhost since we're accessing from browser
+// Use an environment variable for API URL if available
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+// Define a custom MUI theme
+const theme = createTheme({
+  palette: {
+    primary: { main: '#4285f4' },
+    background: { default: '#ffffff', paper: '#f8f9fa' },
+    text: { primary: '#202124', secondary: '#5f6368' },
+  },
+  components: {
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
+          borderRadius: 12,
+        },
+      },
+    },
+    MuiTypography: {
+      styleOverrides: {
+        root: { fontWeight: 500 },
+        subtitle1: { fontWeight: 500 },
+        body1: { fontWeight: 500 },
+        body2: { fontWeight: 500 },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiOutlinedInput-root': {
+            borderRadius: 0,
+            backgroundColor: '#fff',
+            fontWeight: 500,
+          },
+          '& input': { fontWeight: 500 },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 0,
+          textTransform: 'none',
+        },
+      },
+    },
+  },
+});
+
+// Component to display individual chat messages
+const ChatMessage = ({ message }) => {
+  const isUser = message.type === 'user';
+  return (
+    <ListItem sx={{ justifyContent: isUser ? 'flex-end' : 'flex-start', mb: 1 }}>
+      <Paper
+        elevation={1}
+        sx={{
+          p: 2,
+          maxWidth: '70%',
+          backgroundColor: isUser ? theme.palette.primary.main : '#fff',
+          color: isUser ? '#fff' : theme.palette.text.primary,
+          borderRadius: isUser ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
+        }}
+      >
+        <Typography>{message.text}</Typography>
+      </Paper>
+    </ListItem>
+  );
+};
+
+// Component to display the list of bookings
+const BookingList = ({ bookings }) => {
+  const sortedBookings = [...bookings].sort(
+    (a, b) => new Date(a.booking_time) - new Date(b.booking_time)
+  );
+
+  return (
+    <Paper sx={{ p: 3 }}>
+      <Typography variant="h6" gutterBottom>
+        Bookings
+      </Typography>
+      {sortedBookings.length === 0 ? (
+        <Typography color="text.secondary">No bookings found</Typography>
+      ) : (
+        <List>
+          {sortedBookings.map((booking) => (
+            <ListItem key={booking.id} divider>
+              <ListItemText
+                primary={
+                  <Typography variant="subtitle1">
+                    Booking ID: {booking.id} - {booking.technician.type}
+                  </Typography>
+                }
+                secondary={
+                  <>
+                    <Typography component="span" variant="body2" color="text.primary">
+                      Technician: {booking.technician.name}
+                    </Typography>
+                    <br />
+                    <Typography component="span" variant="body2">
+                      Time: {new Date(booking.booking_time).toLocaleString()}
+                    </Typography>
+                    <br />
+                    <Typography component="span" variant="body2">
+                      Status: {booking.status}
+                    </Typography>
+                  </>
+                }
+              />
+            </ListItem>
+          ))}
+        </List>
+      )}
+    </Paper>
+  );
+};
 
 function App() {
-  const [userInput, setUserInput] = useState('')
+  const [userInput, setUserInput] = useState('');
   const [messages, setMessages] = useState([
-    { type: 'system', text: 'Hello! How can I help you today?' }
-  ])
-  const [loading, setLoading] = useState(false)
-  const [bookings, setBookings] = useState([])
-  const [showBookings, setShowBookings] = useState(false)
-  const [deleteLoading, setDeleteLoading] = useState(false)
-  const messagesEndRef = useRef(null)
+    { type: 'system', text: 'Hello! How can I help you today?' },
+  ]);
+  const [loading, setLoading] = useState(false);
+  const [bookings, setBookings] = useState([]);
+  const [showBookings, setShowBookings] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const messagesEndRef = useRef(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  // Scroll to the bottom of the chat whenever new messages arrive
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
+  // Fetch bookings when the component mounts
   useEffect(() => {
-    fetchBookings()
-    scrollToBottom()
-  }, [])
+    fetchBookings();
+    scrollToBottom();
+  }, [scrollToBottom]);
 
+  // Auto-scroll when messages update
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
 
-  const fetchBookings = async () => {
+  // Helper to add a new message to the chat history
+  const addMessage = useCallback((type, text) => {
+    setMessages((prev) => [...prev, { type, text }]);
+  }, []);
+
+  // Fetch bookings from the API
+  const fetchBookings = useCallback(async () => {
     try {
-      console.log("Fetching bookings...")
-      const response = await axios.get(`${API_URL}/bookings/`)
-      console.log("Received bookings:", response.data)
-      setBookings(response.data)
+      const { data } = await axios.get(`${API_URL}/bookings/`);
+      setBookings(data);
     } catch (error) {
-      console.error("Error fetching bookings:", error)
-      addMessage('system', "Failed to fetch bookings")
+      console.error('Error fetching bookings:', error);
+      addMessage('system', 'Failed to fetch bookings');
     }
-  }
+  }, [addMessage]);
 
-  const addMessage = (type, text) => {
-    setMessages(prev => [...prev, { type, text }])
-  }
-
+  // Handle the chat form submission
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!userInput.trim()) return
+    e.preventDefault();
+    if (!userInput.trim()) return;
 
-    const currentInput = userInput
-    setUserInput('')
-    addMessage('user', currentInput)
-    setLoading(true)
+    const currentInput = userInput.trim();
+    setUserInput('');
+    addMessage('user', currentInput);
+    setLoading(true);
 
     try {
-      // Get last 5 messages for context
-      const recentMessages = messages.slice(-5).map(msg => ({
+      // Use the last five messages plus the current one for context
+      const recentMessages = [...messages.slice(-5), { type: 'user', text: currentInput }].map((msg) => ({
         role: msg.type === 'user' ? 'user' : 'assistant',
-        content: msg.text
-      }))
+        content: msg.text,
+      }));
 
-      console.log("Submitting request:", currentInput)
-      console.log("With context:", recentMessages)
-      
-      const response = await axios.post(`${API_URL}/process-request/`, {
+      const { data } = await axios.post(`${API_URL}/process-request/`, {
         message: currentInput,
-        conversation_history: recentMessages
-      })
-      console.log("Received response:", response.data)
+        conversation_history: recentMessages,
+      });
 
-      if (response.data.error) {
-        addMessage('system', response.data.error)
+      if (data.error) {
+        addMessage('system', data.error);
       } else {
-        // Always show the natural language message
-        addMessage('system', response.data.message)
-        
-        // If we have booking data, update the list
-        if (response.data.booking) {
-          await fetchBookings()
+        addMessage('system', data.message);
+        if (data.booking) {
+          await fetchBookings();
         }
       }
     } catch (err) {
-      console.error('Error details:', err)
-      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'An unexpected error occurred'
-      addMessage('system', errorMessage)
+      console.error('Error details:', err);
+      const errorMessage =
+        err.response?.data?.error || err.response?.data?.message || err.message || 'An unexpected error occurred';
+      addMessage('system', errorMessage);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
+  // Handle deletion of all bookings
   const handleDeleteAllBookings = async () => {
     if (!window.confirm('Are you sure you want to delete all bookings? This action cannot be undone.')) {
       return;
     }
-    
     setDeleteLoading(true);
     try {
-      console.log('Attempting to delete all bookings...');
-      const response = await axios.delete(`${API_URL}/bookings/all/`);  
-      console.log('Delete response:', response.data);
+      const { data } = await axios.delete(`${API_URL}/bookings/all/`);
       await fetchBookings();
-      addMessage('system', response.data.message || 'All bookings have been deleted');
+      addMessage('system', data.message || 'All bookings have been deleted');
     } catch (error) {
       console.error('Error deleting bookings:', error);
       const errorMessage = error.response?.data?.detail || error.message;
@@ -127,169 +240,138 @@ function App() {
     }
   };
 
-  const BookingList = ({ bookings }) => {
-    // Sort bookings by booking_time
-    const sortedBookings = [...bookings].sort((a, b) => 
-      new Date(a.booking_time) - new Date(b.booking_time)
-    )
-
-    return (
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h6" gutterBottom>
-          Bookings
-        </Typography>
-        {sortedBookings.length === 0 ? (
-          <Typography color="text.secondary">
-            No bookings found
-          </Typography>
-        ) : (
-          <List>
-            {sortedBookings.map((booking) => (
-              <ListItem key={booking.id} divider>
-                <ListItemText
-                  primary={
-                    <Typography variant="subtitle1">
-                      Booking ID: {booking.id} - {booking.technician.type}
-                    </Typography>
-                  }
-                  secondary={
-                    <>
-                      <Typography component="span" variant="body2" color="text.primary">
-                        Technician: {booking.technician.name}
-                      </Typography>
-                      <br />
-                      <Typography component="span" variant="body2">
-                        Time: {new Date(booking.booking_time).toLocaleString()}
-                      </Typography>
-                      <br />
-                      <Typography component="span" variant="body2">
-                        Status: {booking.status}
-                      </Typography>
-                    </>
-                  }
-                />
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Paper>
-    )
-  }
-
   return (
-    <Container maxWidth="md" sx={{ py: 4, height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Typography variant="h5" component="h1" gutterBottom sx={{ mb: 3 }}>
-        Technician scheduling support
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        We typically reply within a few minutes
-      </Typography>
-
-      {/* Chat Messages */}
-      <Paper 
-        sx={{ 
-          flex: 1, 
-          mb: 2, 
-          p: 2, 
-          overflowY: 'auto',
+    <ThemeProvider theme={theme}>
+      <Container
+        maxWidth="md"
+        sx={{
+          py: 4,
+          height: '100vh',
           display: 'flex',
           flexDirection: 'column',
-          gap: 2
         }}
       >
-        {messages.map((message, index) => (
-          <Box
-            key={index}
+        {/* Header */}
+        <Typography
+          variant="h4"
+          component="h1"
+          sx={{ mb: 1, color: theme.palette.text.primary, fontWeight: 700 }}
+        >
+          Technician scheduling support
+        </Typography>
+        <Typography variant="subtitle1" sx={{ mb: 3, color: theme.palette.text.secondary }}>
+          We typically reply within a few minutes
+        </Typography>
+
+        {/* Chat Window */}
+        <Paper
+          elevation={0}
+          sx={{
+            flex: 1,
+            mb: 2,
+            p: 2,
+            overflowY: 'auto',
+            backgroundColor: theme.palette.background.paper,
+            border: '1px solid rgba(0, 0, 0, 0.12)',
+          }}
+        >
+          <List>
+            {messages.map((message, index) => (
+              <ChatMessage key={index} message={message} />
+            ))}
+            {loading && (
+              <ListItem sx={{ justifyContent: 'flex-start' }}>
+                <Paper
+                  elevation={1}
+                  sx={{
+                    p: 2,
+                    backgroundColor: '#fff',
+                    borderRadius: '20px 20px 20px 4px',
+                  }}
+                >
+                  <CircularProgress size={20} />
+                </Paper>
+              </ListItem>
+            )}
+            <div ref={messagesEndRef} />
+          </List>
+        </Paper>
+
+        {/* Input Form */}
+        <Paper
+          component="form"
+          onSubmit={handleSubmit}
+          sx={{
+            p: 1,
+            display: 'flex',
+            alignItems: 'center',
+            borderRadius: 0,
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
+          }}
+        >
+          <TextField
+            fullWidth
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            placeholder="Type your message..."
+            variant="outlined"
+            size="medium"
             sx={{
-              alignSelf: message.type === 'user' ? 'flex-end' : 'flex-start',
-              maxWidth: '80%'
+              '& .MuiOutlinedInput-root': {
+                '& fieldset': { border: 'none' },
+                borderRadius: 0,
+              },
+            }}
+          />
+          <IconButton
+            type="submit"
+            color="primary"
+            sx={{
+              ml: 1,
+              backgroundColor: theme.palette.primary.main,
+              color: '#fff',
+              borderRadius: 0,
+              '&:hover': { backgroundColor: theme.palette.primary.dark },
             }}
           >
-            <Paper
-              sx={{
-                p: 2,
-                bgcolor: message.type === 'user' ? 'primary.main' : 'grey.100',
-                color: message.type === 'user' ? 'white' : 'text.primary',
-                borderRadius: 2
-              }}
-            >
-              <Typography>{message.text}</Typography>
-            </Paper>
-          </Box>
-        ))}
-        {loading && (
-          <Box sx={{ alignSelf: 'flex-start', maxWidth: '80%' }}>
-            <Paper sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 2 }}>
-              <CircularProgress size={20} sx={{ mr: 1 }} />
-              <Typography component="span">Thinking...</Typography>
-            </Paper>
-          </Box>
-        )}
-        <div ref={messagesEndRef} />
-      </Paper>
+            <SendIcon />
+          </IconButton>
+        </Paper>
 
-      {/* Input Form */}
-      <Paper 
-        component="form" 
-        onSubmit={handleSubmit}
-        sx={{
-          p: 2,
-          display: 'flex',
-          gap: 1,
-          alignItems: 'center'
-        }}
-      >
-        <TextField
+        {/* Bookings Dialog */}
+        <Button variant="outlined" onClick={() => setShowBookings(true)} sx={{ mt: 2 }}>
+          View All Bookings
+        </Button>
+
+        <Dialog
+          open={showBookings}
+          onClose={() => setShowBookings(false)}
+          maxWidth="sm"
           fullWidth
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          placeholder="Type your message..."
-          variant="outlined"
-          disabled={loading}
-          size="small"
-        />
-        <IconButton 
-          type="submit" 
-          color="primary" 
-          disabled={loading || !userInput.trim()}
-          sx={{ bgcolor: 'primary.main', color: 'white', '&:hover': { bgcolor: 'primary.dark' } }}
+          PaperProps={{ sx: { borderRadius: 3 } }}
         >
-          <SendIcon />
-        </IconButton>
-      </Paper>
-
-      {/* Bookings List - Now in a dialog */}
-      <Button 
-        variant="outlined" 
-        onClick={() => setShowBookings(true)}
-        sx={{ mt: 2 }}
-      >
-        View All Bookings
-      </Button>
-      
-      <Dialog 
-        open={showBookings} 
-        onClose={() => setShowBookings(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Current Bookings</DialogTitle>
-        <DialogContent>
-          <BookingList bookings={bookings} />
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={handleDeleteAllBookings} 
-            color="error" 
-            disabled={deleteLoading || bookings.length === 0}
-          >
-            {deleteLoading ? 'Deleting...' : 'Delete All Bookings'}
-          </Button>
-          <Button onClick={() => setShowBookings(false)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
-  )
+          <DialogTitle sx={{ fontWeight: 500 }}>Current Bookings</DialogTitle>
+          <DialogContent>
+            <BookingList bookings={bookings} />
+          </DialogContent>
+          <DialogActions>
+            <Button
+              onClick={handleDeleteAllBookings}
+              color="error"
+              disabled={deleteLoading || bookings.length === 0}
+              sx={{ fontWeight: 500 }}
+            >
+              {deleteLoading ? 'Deleting...' : 'Delete All Bookings'}
+            </Button>
+            <Button onClick={() => setShowBookings(false)} sx={{ fontWeight: 500 }}>
+              Close
+            </Button>
+          </DialogActions>
+        </Dialog>
+      </Container>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
