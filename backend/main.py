@@ -144,181 +144,182 @@ async def process_request(request: dict):
         print("Processing request:", request)
         
         with Session(engine) as session:
-            # Extract conversation history from request
-            conversation_history = request.get("conversation_history", [])
-            
-            # Process the request with conversation history
-            booking_request = await llm_processor.process_request(
-                request["message"], 
-                conversation_history,
-                session
-            )
-            print("LLM Response:", booking_request)
-            
-            if not booking_request or not booking_request.action:
-                raise ValueError("Invalid response from LLM processor")
-
-            if booking_request.action == "create":
-                # Validate technician type and time
-                if not booking_request.technician_type:
-                    error_msg = "I need to know what type of technician you need. Could you please specify if you need a plumber, electrician, or HVAC technician?"
-                    return {"error": error_msg}
+            try:
+                # Extract conversation history from request
+                conversation_history = request.get("conversation_history", [])
                 
-                if not booking_request.booking_time:
-                    error_msg = "I need to know when you'd like to schedule the technician. Could you please specify a time?"
-                    return {"error": error_msg}
-
-                # Parse booking time from ISO format
-                try:
-                    booking_time = datetime.fromisoformat(booking_request.booking_time)
-                except ValueError as e:
-                    error_msg = f"Invalid booking time format: {str(e)}"
-                    return {"error": error_msg}
-
-                # Get technicians of requested type
-                technicians = get_technicians_by_type(session, booking_request.technician_type)
-                if not technicians:
-                    error_msg = f"I'm sorry, but I couldn't find any {booking_request.technician_type}s available. We currently have plumbers, electricians, and HVAC technicians."
-                    return {"error": error_msg}
-
-                # Find available technician
-                available_technician = None
-                
-                for technician in technicians:
-                    if is_technician_available(session, technician.id, booking_time):
-                        available_technician = technician
-                        break
-
-                if not available_technician:
-                    error_msg = f"I apologize, but no {booking_request.technician_type}s are available at {booking_time.strftime('%I:%M %p on %B %d, %Y')}. Would you like to try a different time?"
-                    return {"error": error_msg}
-
-                # Create the booking
-                booking = Booking(
-                    technician_id=available_technician.id,
-                    booking_time=booking_time,
-                    description=f"Scheduled {booking_request.technician_type} appointment",
-                    status="booked"
+                # Process the request with conversation history
+                booking_request = await llm_processor.process_request(
+                    request["message"], 
+                    conversation_history,
+                    session
                 )
-                session.add(booking)
-                session.commit()
-                session.refresh(booking)
+                print("LLM Response:", booking_request)
+                
+                if not booking_request or not booking_request.action:
+                    return {"message": "I'm sorry, but I'm not sure how to help with that request. I can help you create new bookings, cancel existing ones, or look up booking details. What would you like to do?"}
 
-                # Create the response with full booking details
-                booking_response = BookingRead(
-                    id=booking.id,
-                    technician_id=booking.technician_id,
-                    booking_time=booking.booking_time,
-                    description=booking.description,
-                    status=booking.status,
-                    technician=TechnicianRead(
-                        id=available_technician.id,
-                        name=available_technician.name,
-                        type=available_technician.type,
-                        working_hours_start=available_technician.working_hours_start,
-                        working_hours_end=available_technician.working_hours_end,
-                        is_active=available_technician.is_active
-                    )
-                )
+                # Handle supported actions
+                if booking_request.action not in ["create", "cancel", "query"]:
+                    return {"message": "I apologize, but I can only help with creating bookings, canceling them, or looking up booking details. Is there something specific you'd like to do with a booking?"}
 
-                success_msg = f"Great! I've scheduled a {booking_request.technician_type} ({available_technician.name}) for you at {booking_time.strftime('%I:%M %p on %B %d, %Y')}. Your booking ID is {booking.id}."
-                return {"message": success_msg, "booking": booking_response}
-
-            elif booking_request.action == "cancel":
-                print(f"\n=== Cancelling Booking {booking_request.booking_id} ===")
-                if not booking_request.booking_id:
-                    error_msg = "I need the booking ID to cancel an appointment. Could you please provide it?"
-                    return {"error": error_msg}
-                
-                # Get the booking with a FOR UPDATE lock to prevent race conditions
-                statement = select(Booking).where(Booking.id == booking_request.booking_id).with_for_update()
-                booking = session.exec(statement).first()
-                
-                if not booking:
-                    error_msg = f"I couldn't find booking {booking_request.booking_id}. Could you please verify the booking ID?"
-                    return {"error": error_msg}
-                
-                print(f"Found booking: {booking.id} at {booking.booking_time} with status {booking.status}")
-                
-                if booking.status == "cancelled":
-                    return {"message": f"Booking {booking.id} was already cancelled."}
-
-                # Update the status
-                booking.status = "cancelled"
-                session.add(booking)
-                
-                # Explicitly commit the transaction
-                try:
-                    session.commit()
-                    print(f"Successfully cancelled booking {booking.id}")
-                    session.refresh(booking)
-                    print(f"Verified booking status is now: {booking.status}")
+                if booking_request.action == "create":
+                    # Validate technician type and time
+                    if not booking_request.technician_type:
+                        error_msg = "I need to know what type of technician you need. Could you please specify if you need a plumber, electrician, or HVAC technician?"
+                        return {"error": error_msg}
                     
-                    return {"message": f"I've cancelled booking {booking.id} for you. Is there anything else you need help with?"}
-                except Exception as e:
-                    print(f"Error committing cancellation: {str(e)}")
-                    session.rollback()
-                    raise ValueError(f"I'm sorry, but I couldn't cancel the booking due to a system error. Please try again later.")
+                    if not booking_request.booking_time:
+                        error_msg = "I need to know when you'd like to schedule the technician. Could you please specify a time?"
+                        return {"error": error_msg}
 
-            elif booking_request.action == "query":
-                if not booking_request.booking_id:
-                    error_msg = "I need the booking ID to look up the details. Could you please provide it?"
-                    return {"error": error_msg}
+                    # Parse booking time from ISO format
+                    try:
+                        booking_time = datetime.fromisoformat(booking_request.booking_time)
+                    except ValueError as e:
+                        error_msg = f"Invalid booking time format: {str(e)}"
+                        return {"error": error_msg}
 
-                # Get the booking with technician information
-                result = session.exec(
-                    select(Booking, Technician)
-                    .join(Technician)
-                    .where(Booking.id == booking_request.booking_id)
-                ).first()
-                
-                if not result:
-                    error_msg = f"I couldn't find booking {booking_request.booking_id}. Could you please verify the booking ID?"
-                    return {"error": error_msg}
-                
-                booking, technician = result
-                booking_time = booking.booking_time.strftime("%I:%M %p on %B %d, %Y")
-                
-                # Create the response with full booking details
-                booking_response = BookingRead(
-                    id=booking.id,
-                    technician_id=booking.technician_id,
-                    booking_time=booking.booking_time,
-                    description=booking.description,
-                    status=booking.status,
-                    technician=TechnicianRead(
-                        id=technician.id,
-                        name=technician.name,
-                        type=technician.type,
-                        working_hours_start=technician.working_hours_start,
-                        working_hours_end=technician.working_hours_end,
-                        is_active=technician.is_active
+                    # Get technicians of requested type
+                    technicians = get_technicians_by_type(session, booking_request.technician_type)
+                    if not technicians:
+                        error_msg = f"I'm sorry, but I couldn't find any {booking_request.technician_type}s available. We currently have plumbers, electricians, and HVAC technicians."
+                        return {"error": error_msg}
+
+                    # Find available technician
+                    available_technician = None
+                    
+                    for technician in technicians:
+                        if is_technician_available(session, technician.id, booking_time):
+                            available_technician = technician
+                            break
+
+                    if not available_technician:
+                        error_msg = f"I apologize, but no {booking_request.technician_type}s are available at {booking_time.strftime('%I:%M %p on %B %d, %Y')}. Would you like to try a different time?"
+                        return {"error": error_msg}
+
+                    # Create the booking
+                    booking = Booking(
+                        technician_id=available_technician.id,
+                        booking_time=booking_time,
+                        description=f"Scheduled {booking_request.technician_type} appointment",
+                        status="booked"
                     )
-                )
-                
-                response = (
-                    f"Here are the details for booking {booking.id}:\n"
-                    f"- Time: {booking_time}\n"
-                    f"- Technician: {technician.name} ({technician.type})\n"
-                    f"- Status: {booking.status}\n"
-                    f"- Working Hours: {technician.working_hours_start}:00-{technician.working_hours_end}:00"
-                )
-                
-                return {"message": response, "booking": booking_response}
+                    session.add(booking)
+                    session.commit()
+                    session.refresh(booking)
 
-    except ValueError as e:
-        error_msg = str(e)
-        print("ValueError:", error_msg)
-        return {"error": error_msg}
+                    # Create the response with full booking details
+                    booking_response = BookingRead(
+                        id=booking.id,
+                        technician_id=booking.technician_id,
+                        booking_time=booking.booking_time,
+                        description=booking.description,
+                        status=booking.status,
+                        technician=TechnicianRead(
+                            id=available_technician.id,
+                            name=available_technician.name,
+                            type=available_technician.type,
+                            working_hours_start=available_technician.working_hours_start,
+                            working_hours_end=available_technician.working_hours_end,
+                            is_active=available_technician.is_active
+                        )
+                    )
+
+                    success_msg = f"Great! I've scheduled a {booking_request.technician_type} ({available_technician.name}) for you at {booking_time.strftime('%I:%M %p on %B %d, %Y')}. Your booking ID is {booking.id}."
+                    return {"message": success_msg, "booking": booking_response}
+
+                elif booking_request.action == "cancel":
+                    print(f"\n=== Cancelling Booking {booking_request.booking_id} ===")
+                    if not booking_request.booking_id:
+                        error_msg = "I need the booking ID to cancel an appointment. Could you please provide it?"
+                        return {"error": error_msg}
+                    
+                    # Get the booking with a FOR UPDATE lock to prevent race conditions
+                    statement = select(Booking).where(Booking.id == booking_request.booking_id).with_for_update()
+                    booking = session.exec(statement).first()
+                    
+                    if not booking:
+                        error_msg = f"I couldn't find booking {booking_request.booking_id}. Could you please verify the booking ID?"
+                        return {"error": error_msg}
+                    
+                    print(f"Found booking: {booking.id} at {booking.booking_time} with status {booking.status}")
+                    
+                    if booking.status == "cancelled":
+                        return {"message": f"Booking {booking.id} was already cancelled."}
+
+                    # Update the status
+                    booking.status = "cancelled"
+                    session.add(booking)
+                    
+                    # Explicitly commit the transaction
+                    try:
+                        session.commit()
+                        print(f"Successfully cancelled booking {booking.id}")
+                        session.refresh(booking)
+                        print(f"Verified booking status is now: {booking.status}")
+                        
+                        return {"message": f"I've cancelled booking {booking.id} for you. Is there anything else you need help with?"}
+                    except Exception as e:
+                        print(f"Error committing cancellation: {str(e)}")
+                        session.rollback()
+                        raise ValueError(f"I'm sorry, but I couldn't cancel the booking due to a system error. Please try again later.")
+
+                elif booking_request.action == "query":
+                    if not booking_request.booking_id:
+                        error_msg = "I need the booking ID to look up the details. Could you please provide it?"
+                        return {"error": error_msg}
+
+                    # Get the booking with technician information
+                    result = session.exec(
+                        select(Booking, Technician)
+                        .join(Technician)
+                        .where(Booking.id == booking_request.booking_id)
+                    ).first()
+                    
+                    if not result:
+                        error_msg = f"I couldn't find booking {booking_request.booking_id}. Could you please verify the booking ID?"
+                        return {"error": error_msg}
+                    
+                    booking, technician = result
+                    booking_time = booking.booking_time.strftime("%I:%M %p on %B %d, %Y")
+                    
+                    # Create the response with full booking details
+                    booking_response = BookingRead(
+                        id=booking.id,
+                        technician_id=booking.technician_id,
+                        booking_time=booking.booking_time,
+                        description=booking.description,
+                        status=booking.status,
+                        technician=TechnicianRead(
+                            id=technician.id,
+                            name=technician.name,
+                            type=technician.type,
+                            working_hours_start=technician.working_hours_start,
+                            working_hours_end=technician.working_hours_end,
+                            is_active=technician.is_active
+                        )
+                    )
+                    
+                    response = (
+                        f"Here are the details for booking {booking.id}:\n"
+                        f"- Time: {booking_time}\n"
+                        f"- Technician: {technician.name} ({technician.type})\n"
+                        f"- Status: {booking.status}\n"
+                        f"- Working Hours: {technician.working_hours_start}:00-{technician.working_hours_end}:00"
+                    )
+                    
+                    return {"message": response, "booking": booking_response}
+
+            except ValueError as e:
+                # Handle validation errors gracefully
+                return {"message": "I'm sorry, but I'm not able to process that request. I can help you create new bookings, cancel existing ones, or look up booking details. What would you like to do?"}
+            except Exception as e:
+                print(f"Error processing request: {str(e)}")
+                return {"message": "I apologize, but I'm having trouble understanding your request. Could you please rephrase it or specify if you want to create a booking, cancel one, or look up booking details?"}
     except Exception as e:
-        import traceback
-        error_trace = traceback.format_exc()
-        print("Unexpected error:", str(e))
-        print("Full traceback:", error_trace)
-        return {
-            "error": f"An unexpected error occurred: {str(e)}",
-            "traceback": error_trace
-        }
+        print(f"Unexpected error: {str(e)}")
+        return {"message": "I encountered an unexpected issue. Could you please try your request again?"}
 
 @app.get("/bookings/", response_model=List[BookingRead])
 def list_bookings(session: Session = Depends(get_session)):
