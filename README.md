@@ -16,7 +16,8 @@ technician-booking-system/
 - Schedule technician appointments
 - List all bookings
 - Retrieve booking details
-- Delete/cancel bookings
+- Delete/cancel individual bookings
+- Bulk delete all bookings
 - Natural language processing using LangChain with Groq
 - Modern UI with Material UI and Vite
 - RESTful API backend with SQLModel (SQLAlchemy + Pydantic)
@@ -118,6 +119,24 @@ npm run dev
 ```
 
 The development server will start at `http://localhost:5173` by default.
+
+## API Endpoints
+
+The backend provides the following RESTful endpoints:
+
+### Bookings
+- `GET /bookings/`: List all active bookings
+- `POST /bookings/`: Create a new booking
+- `GET /bookings/{id}`: Get details of a specific booking
+- `DELETE /bookings/{id}`: Cancel a specific booking
+- `DELETE /bookings/all/`: Delete all active bookings
+
+### Technicians
+- `GET /technicians/`: List all technicians
+- `GET /technicians/{id}/availability/{date}`: Get available slots for a technician on a specific date
+
+### Natural Language Processing
+- `POST /process-request/`: Process a natural language booking request
 
 ## API Documentation
 

@@ -54,7 +54,7 @@ app = FastAPI(lifespan=lifespan)
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -384,3 +384,25 @@ def delete_booking(booking_id: int, session: Session = Depends(get_session)):
     session.commit()
     
     return {"message": f"Booking {booking_id} cancelled"}
+
+@app.delete("/bookings/all/")
+async def delete_all_bookings(session: Session = Depends(get_session)):
+    """Delete all bookings from the database."""
+    try:
+        logger.info("Attempting to delete all bookings...")
+        statement = select(Booking).where(Booking.status == "booked")
+        bookings = session.exec(statement).all()
+        
+        count = len(bookings)
+        logger.info(f"Found {count} bookings to delete")
+        
+        for booking in bookings:
+            session.delete(booking)
+        
+        session.commit()
+        logger.info(f"Successfully deleted {count} bookings")
+        return {"message": f"Successfully deleted {count} bookings"}
+    except Exception as e:
+        logger.error(f"Error deleting bookings: {str(e)}")
+        session.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

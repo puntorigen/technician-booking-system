@@ -29,6 +29,7 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [bookings, setBookings] = useState([])
   const [showBookings, setShowBookings] = useState(false)
+  const [deleteLoading, setDeleteLoading] = useState(false)
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -104,6 +105,27 @@ function App() {
       setLoading(false)
     }
   }
+
+  const handleDeleteAllBookings = async () => {
+    if (!window.confirm('Are you sure you want to delete all bookings? This action cannot be undone.')) {
+      return;
+    }
+    
+    setDeleteLoading(true);
+    try {
+      console.log('Attempting to delete all bookings...');
+      const response = await axios.delete(`${API_URL}/bookings/all/`);  
+      console.log('Delete response:', response.data);
+      await fetchBookings();
+      addMessage('system', response.data.message || 'All bookings have been deleted');
+    } catch (error) {
+      console.error('Error deleting bookings:', error);
+      const errorMessage = error.response?.data?.detail || error.message;
+      addMessage('system', `Failed to delete bookings: ${errorMessage}`);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const BookingList = ({ bookings }) => {
     // Sort bookings by booking_time
@@ -256,6 +278,13 @@ function App() {
           <BookingList bookings={bookings} />
         </DialogContent>
         <DialogActions>
+          <Button 
+            onClick={handleDeleteAllBookings} 
+            color="error" 
+            disabled={deleteLoading || bookings.length === 0}
+          >
+            {deleteLoading ? 'Deleting...' : 'Delete All Bookings'}
+          </Button>
           <Button onClick={() => setShowBookings(false)}>Close</Button>
         </DialogActions>
       </Dialog>
