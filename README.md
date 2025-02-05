@@ -16,9 +16,9 @@ The demo shows the main features of the application:
 
 ```
 technician-booking-system/
-├── backend/           # FastAPI backend service with SQLModel, LangChain and Groq
+├── backend/          # FastAPI backend service with SQLModel, LangChain and Groq
 ├── frontend/         # Vite + React frontend application
-└── docs/            # Project documentation
+└── docs/             # readme assets
 ```
 
 ## Features
