@@ -125,26 +125,27 @@ The API documentation is available at `http://localhost:8000/docs` when running 
 
 ## Database Schema
 
-The application uses SQLModel (SQLAlchemy + Pydantic) for the database layer, providing type safety and automatic validation. The database consists of two main models:
+The application uses SQLite with SQLModel (SQLAlchemy + Pydantic) for the database. Here's the entity relationship diagram:
 
-### Technician
-- id: Integer (Primary Key)
-- name: String (indexed)
-- type: String
-- working_hours_start: Integer (default: 9)
-- working_hours_end: Integer (default: 17)
-- is_active: Boolean (default: True)
-
-### Booking
-- id: Integer (Primary Key)
-- technician_id: Integer (Foreign Key → Technician.id)
-- booking_time: DateTime
-- description: String
-- status: String (default: "booked")
-
-### Relationships
-- Each Booking belongs to one Technician (many-to-one)
-- A Technician can have multiple Bookings (one-to-many)
+```mermaid
+erDiagram
+    Technician {
+        int id PK
+        string name
+        string type
+        int working_hours_start
+        int working_hours_end
+        boolean is_active
+    }
+    Booking {
+        int id PK
+        int technician_id FK
+        datetime booking_time
+        string description
+        string status
+    }
+    Technician ||--o{ Booking : "has"
+```
 
 ### Database Initialization
 
