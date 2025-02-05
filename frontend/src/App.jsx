@@ -21,7 +21,7 @@ import SendIcon from '@mui/icons-material/Send';
 import axios from 'axios';
 
 // Use an environment variable for API URL if available
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = 'http://localhost:8000';
 
 // Define a custom MUI theme
 const theme = createTheme({
