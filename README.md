@@ -2,6 +2,16 @@
 
 A full-stack application for managing technician bookings and appointments.
 
+## Demo
+
+![Demo of the Technician Booking System](docs/demo-small.gif)
+
+The demo shows the main features of the application:
+- Natural language booking creation
+- Real-time chat interface
+- Viewing all bookings
+- Modern and responsive UI
+
 ## Project Structure
 
 ```
